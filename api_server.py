@@ -9,6 +9,7 @@ LuxTTS Legado API 服务
 import gc
 import io
 import os
+import random
 import warnings
 from pathlib import Path
 
@@ -104,10 +105,23 @@ def _get_encoded_prompt(model, ref_path: Path, duration: int = 5, rms: float = 0
     return encoded
 
 
-def _generate_tts(text: str, ref_audio_path: str, speed: float = 1.0) -> bytes:
-    """生成 TTS 音频并返回 WAV 字节"""
+def _set_random_seed():
+    """设置随机种子为随机值，保证每次推理结果不同"""
+    seed = random.randint(0, 2**32 - 1)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    return seed
+
+
+def _generate_tts(text: str, ref_audio_path: str, speed: float = 0.8) -> bytes:
+    """生成 TTS 音频并返回 WAV 字节。参数与 UI 一致：rms=0.01, steps=4, t_shift=0.9, ref_duration=5, 种子随机"""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = _load_model(device)
+
+    _set_random_seed()
 
     ref_path = _resolve_ref_audio_path(ref_audio_path)
     encoded_prompt = _get_encoded_prompt(model, ref_path, duration=5, rms=0.01)
@@ -159,7 +173,7 @@ def _get_ref_audio(ref_audio: str | None) -> str:
 @app.get("/api/tts")
 async def tts_get(
     text: str = Query(..., description="待合成文本"),
-    speed: float = Query(1.0, ge=0.1, le=3.0, description="语速"),
+    speed: float = Query(0.8, ge=0.1, le=3.0, description="语速"),
     ref_audio: str | None = Query(None, description="参考音频路径"),
 ):
     """GET 方式 TTS 接口，Legado 兼容"""
@@ -181,14 +195,14 @@ async def tts_post(request: Request):
     if "application/json" in content_type:
         body = await request.json()
         text = body.get("text")
-        speed = float(body.get("speed", 1.0))
+        speed = float(body.get("speed", 0.8))
         ref_audio = body.get("ref_audio")
     else:
         # form-urlencoded
         form = await request.form()
         text = form.get("text")
-        speed_val = form.get("speed", "1.0")
-        speed = float(speed_val) if speed_val else 1.0
+        speed_val = form.get("speed", "0.8")
+        speed = float(speed_val) if speed_val else 0.8
         ref_audio = form.get("ref_audio")
 
     if not text:

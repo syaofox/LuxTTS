@@ -156,9 +156,9 @@ with gr.Blocks(title="LuxTTS 语音克隆") as demo:
             
             with gr.Accordion("高级参数 / Advanced Parameters", open=True):
                 seed_input = gr.Number(
-                    value=42, precision=0,
+                    value=-1, precision=0,
                     label="随机种子 / Seed（-1 为随机）",
-                    info="控制生成随机性，相同种子可复现相同结果"
+                    info="控制生成随机性，相同种子可复现相同结果；-1 表示每次随机"
                 )
                 rms_slider = gr.Slider(
                     0.001, 0.1, value=0.01, step=0.001,
