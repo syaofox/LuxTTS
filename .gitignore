@@ -195,3 +195,5 @@ cython_debug/
 .cursorindexingignore
 
 ckpt/
+ref_audio/
+legado_config_luxtts.json

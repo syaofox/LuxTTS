@@ -23,3 +23,7 @@ jieba
 piper_phonemize
 pypinyin
 setuptools<81
+
+# API 服务 (Legado 兼容)
+fastapi
+uvicorn
