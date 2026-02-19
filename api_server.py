@@ -30,6 +30,10 @@ active_device = None
 # 默认参考音频（环境变量 LUXTTS_REF_AUDIO 或启动时设置）
 DEFAULT_REF_AUDIO: str | None = os.environ.get("LUXTTS_REF_AUDIO")
 
+# 参考音频 encode_prompt 缓存，避免相同参考音频重复识别
+_ENCODED_PROMPT_CACHE: dict[tuple, dict] = {}
+_CACHE_MAX_SIZE = 10
+
 app = FastAPI(
     title="LuxTTS API",
     description="Legado 兼容的 TTS 接口，基于 LuxTTS 语音克隆",
@@ -87,18 +91,26 @@ def _resolve_ref_audio_path(path: str) -> Path:
     return resolved
 
 
+def _get_encoded_prompt(model, ref_path: Path, duration: int = 5, rms: float = 0.01) -> dict:
+    """获取参考音频的编码结果，相同文件复用缓存"""
+    mtime = ref_path.stat().st_mtime
+    key = (str(ref_path.resolve()), duration, rms, mtime)
+    if key in _ENCODED_PROMPT_CACHE:
+        return _ENCODED_PROMPT_CACHE[key]
+    encoded = model.encode_prompt(str(ref_path), duration=duration, rms=rms)
+    if len(_ENCODED_PROMPT_CACHE) >= _CACHE_MAX_SIZE:
+        _ENCODED_PROMPT_CACHE.clear()
+    _ENCODED_PROMPT_CACHE[key] = encoded
+    return encoded
+
+
 def _generate_tts(text: str, ref_audio_path: str, speed: float = 1.0) -> bytes:
     """生成 TTS 音频并返回 WAV 字节"""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = _load_model(device)
 
     ref_path = _resolve_ref_audio_path(ref_audio_path)
-
-    encoded_prompt = model.encode_prompt(
-        str(ref_path),
-        duration=5,
-        rms=0.01,
-    )
+    encoded_prompt = _get_encoded_prompt(model, ref_path, duration=5, rms=0.01)
 
     final_wav = model.generate_speech(
         text,
