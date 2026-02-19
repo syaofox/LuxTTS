@@ -25,7 +25,7 @@ def load_model(target_device):
 
     # Safety check for CUDA
     if target_device == "cuda" and not torch.cuda.is_available():
-        raise gr.Error("❌ CUDA (GPU) is not available on this system. Please select CPU.")
+        raise gr.Error("❌ 本系统不支持 CUDA (GPU)，请选择 CPU。")
 
     print(f"\n🔄 Loading LuxTTS Model on [{target_device.upper()}]...")
     
@@ -46,7 +46,7 @@ def load_model(target_device):
 
     except Exception as e:
         print(f"Initialization Error: {e}")
-        raise gr.Error(f"Failed to load model on {target_device}. See terminal for details.")
+        raise gr.Error(f"在 {target_device} 上加载模型失败，请查看终端获取详情。")
 
 # --- HELPER: SEEDING ---
 def set_all_seeds(seed):
@@ -62,7 +62,7 @@ def set_all_seeds(seed):
 def clone_voice(text, ref_audio_path, rms, t_shift, num_steps, speed, return_smooth, ref_duration, seed, device_choice):
     
     if not ref_audio_path:
-        raise gr.Error("Please upload a reference audio file.")
+        raise gr.Error("请上传参考音频文件。")
 
     # 1. Load/Switch Model (Only happens if device changed)
     model = load_model(device_choice)
@@ -110,10 +110,10 @@ def clone_voice(text, ref_audio_path, rms, t_shift, num_steps, speed, return_smo
     speedup = audio_duration_sec / generation_time if generation_time > 0 else 0
     
     stats_msg = (
-        f"💻 Device:          {device_choice.upper()}\n"
-        f"⏱️ Generation Time: {generation_time:.4f} sec\n"
-        f"🔊 Audio Duration:  {audio_duration_sec:.2f} sec\n"
-        f"🚀 Speed:           {speedup:.1f}x Real-Time"
+        f"💻 设备:            {device_choice.upper()}\n"
+        f"⏱️ 生成耗时:        {generation_time:.4f} 秒\n"
+        f"🔊 音频时长:        {audio_duration_sec:.2f} 秒\n"
+        f"🚀 实时倍率:        {speedup:.1f}x"
     )
     
     print(stats_msg)
@@ -122,20 +122,18 @@ def clone_voice(text, ref_audio_path, rms, t_shift, num_steps, speed, return_smo
 
 # --- LONGER EXAMPLE TEXT ---
 long_text_example = (
-    "In the heart of the ancient forest, sunlight filtered through the canopy in beams of "
-    "pure gold, illuminating dust motes dancing in the still air. The only sound was the "
-    "gentle murmur of a nearby brook, winding its way over mossy stones that had stood "
-    "unchanged for centuries. It was a place where time seemed to slow down, allowing "
-    "weary travelers to forget the burdens of the world outside."
+    "在古老森林的深处，阳光透过树冠洒下缕缕金光，照亮了在静止空气中飞舞的尘埃。"
+    "唯一的声音是附近小溪的潺潺流水，蜿蜒流过长满青苔、历经数百年不变的石头。"
+    "这是一个时间仿佛放慢脚步的地方，让疲惫的旅人忘却外界世界的重担。"
 )
 
 # --- STARTUP: DETECT DEFAULT DEVICE ---
 default_device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # --- GRADIO INTERFACE ---
-with gr.Blocks(title="LuxTTS Ultimate Playground") as demo:
-    gr.Markdown("# 🎙️ LuxTTS Ultimate Playground")
-    gr.Markdown("Test speed, quality, and hardware performance (CPU vs GPU).")
+with gr.Blocks(title="LuxTTS 语音克隆") as demo:
+    gr.Markdown("# 🎙️ LuxTTS 语音克隆")
+    gr.Markdown("测试速度、音质与硬件性能（CPU 与 GPU 对比）。")
     
     with gr.Row():
         with gr.Column():
@@ -143,34 +141,62 @@ with gr.Blocks(title="LuxTTS Ultimate Playground") as demo:
             device_radio = gr.Radio(
                 choices=["cuda", "cpu"], 
                 value=default_device, 
-                label="Compute Device (Switching takes a few seconds)"
+                label="计算设备（切换需几秒钟）"
             )
 
             text_input = gr.Textbox(
-                label="Text to Speak", 
+                label="待合成文本", 
                 value=long_text_example,
                 lines=5
             )
             ref_audio_input = gr.Audio(
-                label="Reference Audio", 
+                label="参考音频", 
                 type="filepath"
             )
             
-            with gr.Accordion("Advanced Parameters", open=True):
-                seed_input = gr.Number(value=42, label="Seed (-1 for Random)", precision=0)
-                rms_slider = gr.Slider(0.001, 0.1, value=0.01, step=0.001, label="RMS")
-                speed_slider = gr.Slider(0.1, 3.0, value=0.8, step=0.1, label="Speed")
-                steps_slider = gr.Slider(1, 20, value=4, step=1, label="Num Steps")
-                t_shift_slider = gr.Slider(0.1, 2.0, value=0.9, step=0.1, label="T Shift")
-                duration_number = gr.Number(value=5, label="Ref Duration (sec)")
-                smooth_check = gr.Checkbox(label="Return Smooth", value=False)
+            with gr.Accordion("高级参数 / Advanced Parameters", open=True):
+                seed_input = gr.Number(
+                    value=42, precision=0,
+                    label="随机种子 / Seed（-1 为随机）",
+                    info="控制生成随机性，相同种子可复现相同结果"
+                )
+                rms_slider = gr.Slider(
+                    0.001, 0.1, value=0.01, step=0.001,
+                    label="RMS / 响度归一化",
+                    info="参考音频响度目标值，越大输出越响，推荐 0.01"
+                )
+                speed_slider = gr.Slider(
+                    0.1, 3.0, value=0.8, step=0.1,
+                    label="语速 / Speed",
+                    info="1.0 为正常语速，>1 加速，<1 减速"
+                )
+                steps_slider = gr.Slider(
+                    1, 20, value=4, step=1,
+                    label="步数 / Num Steps",
+                    info="扩散采样步数，越大音质越好但越慢，3–4 为效率最佳"
+                )
+                t_shift_slider = gr.Slider(
+                    0.1, 2.0, value=0.9, step=0.1,
+                    label="T Shift / 时间偏移",
+                    info="采样时间偏移，较高可提升音质但可能增加识别错误"
+                )
+                duration_number = gr.Number(
+                    value=5,
+                    label="参考时长 / Ref Duration（秒）",
+                    info="参考音频截取时长，越小推理越快；出现伪影时可设为 1000"
+                )
+                smooth_check = gr.Checkbox(
+                    label="平滑输出 / Return Smooth",
+                    value=False,
+                    info="输出更平滑，可减轻金属感，但可能略欠清晰"
+                )
 
-            generate_btn = gr.Button("Generate Voice", variant="primary")
+            generate_btn = gr.Button("生成语音", variant="primary")
 
         with gr.Column():
-            output_audio = gr.Audio(label="Generated Result")
-            stats_output = gr.Textbox(label="Performance Metrics", lines=5, interactive=False)
-            seed_output = gr.Number(label="Actual Seed Used", interactive=False)
+            output_audio = gr.Audio(label="生成结果")
+            stats_output = gr.Textbox(label="性能指标", lines=5, interactive=False)
+            seed_output = gr.Number(label="实际使用的种子", interactive=False)
 
     # Initialize model on startup (optional, makes first generation faster)
     # logic: we just print a message, the actual load happens on first click or we can force it here.
