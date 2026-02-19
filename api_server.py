@@ -139,13 +139,6 @@ def _generate_tts(text: str, ref_audio_path: str, speed: float = 0.8) -> bytes:
     audio_data = np.clip(audio_data, -1.0, 1.0)
     audio_data = (audio_data * 32767).astype(np.int16)
 
-    # Legado 合并音频时会吞掉边界样本，在头尾添加静音 padding 作为缓冲
-    SAMPLE_RATE = 48000
-    PAD_MS = 80  # 每侧 80ms 静音，合并时被截掉的是静音而非语音
-    pad_samples = int(SAMPLE_RATE * PAD_MS / 1000)
-    pad = np.zeros(pad_samples, dtype=np.int16)
-    audio_data = np.concatenate([pad, audio_data, pad])
-
     # 写入 WAV 到内存
     import wave
 
