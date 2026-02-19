@@ -39,7 +39,7 @@ def load_model(target_device):
     try:
         from zipvoice.luxvoice import LuxTTS
         # Initialize the model on the requested device
-        lux_tts = LuxTTS('./ckpt/LuxTTS', device=target_device)
+        lux_tts = LuxTTS(device=target_device)  # 优先使用 ckpt/LuxTTS，不存在则自动下载
         active_device = target_device
         print(f"✅ Model successfully loaded on {target_device}")
         return lux_tts

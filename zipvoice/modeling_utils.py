@@ -30,6 +30,54 @@ from zipvoice.onnx_modeling import OnnxModel
 from torch.nn.utils import parametrize
 
 
+# 默认本地模型目录（相对于项目根目录）
+_THIS_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _THIS_DIR.parent
+DEFAULT_CKPT_DIR = _PROJECT_ROOT / "ckpt" / "LuxTTS"
+HF_REPO_ID = "YatharthS/LuxTTS"
+
+
+def get_model_path(local_path: Optional[str] = None, use_cpu: bool = False) -> str:
+    """
+    优先使用本地模型；若本地不存在，则自动下载到 ckpt 目录。
+    Returns: 模型目录的绝对路径
+    """
+    path = Path(local_path).resolve() if local_path else DEFAULT_CKPT_DIR
+
+    # GPU 需要 model.pt，CPU 需要 ONNX 文件
+    if use_cpu:
+        has_model = (path / "text_encoder.onnx").exists() and (path / "fm_decoder.onnx").exists()
+    else:
+        has_model = (path / "model.pt").exists()
+
+    if not has_model:
+        path.mkdir(parents=True, exist_ok=True)
+        print(f"📥 本地模型未找到，正在下载到 {path} ...")
+        snapshot_download(HF_REPO_ID, local_dir=str(path))
+        print("✅ 下载完成。")
+
+    return str(path)
+
+
+def get_whisper_model_path(size: str) -> str:
+    """
+    优先使用本地 Whisper 模型；若本地不存在，则自动下载到 ckpt/whisper-{size}。
+    size: "tiny" | "base"
+    """
+    path = _PROJECT_ROOT / "ckpt" / f"whisper-{size}"
+    has_model = (path / "config.json").exists() and (
+        (path / "model.safetensors").exists() or (path / "pytorch_model.bin").exists()
+    )
+
+    if not has_model:
+        path.mkdir(parents=True, exist_ok=True)
+        print(f"📥 本地 Whisper-{size} 未找到，正在下载到 {path} ...")
+        snapshot_download(f"openai/whisper-{size}", local_dir=str(path))
+        print("✅ 下载完成。")
+
+    return str(path)
+
+
 @dataclass
 class LuxTTSConfig:
     # Model Setup
@@ -92,14 +140,14 @@ def generate(prompt_tokens, prompt_features_lens, prompt_features, prompt_rms, t
 
 def load_models_gpu(model_path=None, device="cuda"):
     params = LuxTTSConfig()
-    if model_path is None:
-        model_path = snapshot_download("YatharthS/LuxTTS")
+    model_path = get_model_path(local_path=model_path, use_cpu=False)
 
     token_file = f"{model_path}/tokens.txt"
     model_ckpt = f"{model_path}/model.pt"
     model_config = f"{model_path}/config.json"
 
-    transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-base", device=device)
+    whisper_path = get_whisper_model_path("base")
+    transcriber = pipeline("automatic-speech-recognition", model=whisper_path, device=device)
     tokenizer = EmiliaTokenizer(token_file=token_file)
     tokenizer_config = {"vocab_size": tokenizer.vocab_size, "pad_id": tokenizer.pad_id}
 
@@ -124,18 +172,19 @@ def load_models_gpu(model_path=None, device="cuda"):
     params.sampling_rate = model_config["feature"]["sampling_rate"]
     return model, feature_extractor, vocos, tokenizer, transcriber
 
-def load_models_cpu(model_path = None, num_thread=2):
+def load_models_cpu(model_path=None, num_thread=2):
     params = LuxTTSConfig()
     params.seed = 42
 
-    model_path = snapshot_download('YatharthS/LuxTTS')
+    model_path = get_model_path(local_path=model_path, use_cpu=True)
 
     token_file = f"{model_path}/tokens.txt"
     text_encoder_path = f"{model_path}/text_encoder.onnx"
     fm_decoder_path = f"{model_path}/fm_decoder.onnx"
     model_config  = f"{model_path}/config.json"
 
-    transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-tiny", device='cpu')
+    whisper_path = get_whisper_model_path("tiny")
+    transcriber = pipeline("automatic-speech-recognition", model=whisper_path, device='cpu')
 
     tokenizer = EmiliaTokenizer(token_file=token_file)
     tokenizer_config = {"vocab_size": tokenizer.vocab_size, "pad_id": tokenizer.pad_id}
