@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "cn2an",
+  "gradio>=6.6.0",
   "huggingface-hub",
   "inflect",
   "jieba",
