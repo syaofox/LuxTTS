@@ -116,20 +116,26 @@ def _set_random_seed():
     return seed
 
 
-def _generate_tts(text: str, ref_audio_path: str, speed: float = 0.8) -> bytes:
-    """生成 TTS 音频并返回 WAV 字节。参数与 UI 一致：rms=0.01, steps=4, t_shift=0.9, ref_duration=5, 种子随机"""
+def _generate_tts(
+    text: str,
+    ref_audio_path: str,
+    speed: float = 0.8,
+    duration: int = 1000,
+    num_steps: int = 4,
+) -> bytes:
+    """生成 TTS 音频并返回 WAV 字节。参数与 UI 一致：rms=0.01, t_shift=0.9, 种子随机"""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = _load_model(device)
 
     _set_random_seed()
 
     ref_path = _resolve_ref_audio_path(ref_audio_path)
-    encoded_prompt = _get_encoded_prompt(model, ref_path, duration=5, rms=0.01)
+    encoded_prompt = _get_encoded_prompt(model, ref_path, duration=duration, rms=0.01)
 
     final_wav = model.generate_speech(
         text,
         encoded_prompt,
-        num_steps=4,
+        num_steps=num_steps,
         t_shift=0.9,
         speed=speed,
         return_smooth=False,
@@ -168,11 +174,13 @@ async def tts_get(
     text: str = Query(..., description="待合成文本"),
     speed: float = Query(0.8, ge=0.1, le=3.0, description="语速"),
     ref_audio: str | None = Query(None, description="参考音频路径"),
+    duration: int = Query(5, ge=1, le=30, description="参考音频截取时长(秒)"),
+    num_steps: int = Query(4, ge=1, le=20, description="扩散步数"),
 ):
     """GET 方式 TTS 接口，Legado 兼容"""
     ref_path = _get_ref_audio(ref_audio)
     try:
-        wav_bytes = _generate_tts(text, ref_path, speed)
+        wav_bytes = _generate_tts(text, ref_path, speed, duration=duration, num_steps=num_steps)
         return Response(content=wav_bytes, media_type="audio/wav")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -190,6 +198,10 @@ async def tts_post(request: Request):
         text = body.get("text")
         speed = float(body.get("speed", 0.8))
         ref_audio = body.get("ref_audio")
+        duration = int(body.get("duration", 5))
+        num_steps = int(body.get("num_steps", 4))
+        duration = max(1, min(30, duration))
+        num_steps = max(1, min(20, num_steps))
     else:
         # form-urlencoded
         form = await request.form()
@@ -197,13 +209,17 @@ async def tts_post(request: Request):
         speed_val = form.get("speed", "0.8")
         speed = float(speed_val) if speed_val else 0.8
         ref_audio = form.get("ref_audio")
+        duration = int(form.get("duration", 5))
+        num_steps = int(form.get("num_steps", 4))
+        duration = max(1, min(30, duration))
+        num_steps = max(1, min(20, num_steps))
 
     if not text:
         raise HTTPException(status_code=400, detail="缺少 text 参数")
 
     ref_path = _get_ref_audio(ref_audio)
     try:
-        wav_bytes = _generate_tts(text, ref_path, speed)
+        wav_bytes = _generate_tts(text, ref_path, speed, duration=duration, num_steps=num_steps)
         return Response(content=wav_bytes, media_type="audio/wav")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
