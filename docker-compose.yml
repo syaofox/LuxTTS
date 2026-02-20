@@ -1,0 +1,15 @@
+services:
+  luxtts:
+    build: .
+    image: luxtts:cpu
+    container_name: luxtts
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./ref_audio:/app/ref_audio
+      - ./cache:/app/.cache
+      - ./ckpt:/app/ckpt
+    environment:
+      - LUXTTS_REF_AUDIO=ref_audio/default.wav
+      - HF_HOME=/app/.cache/huggingface
+    restart: unless-stopped

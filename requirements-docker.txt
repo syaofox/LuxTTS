@@ -1,0 +1,25 @@
+# Docker 构建用 - 不含 torch/torchaudio（已单独安装 CPU 版）
+--find-links https://k2-fsa.github.io/icefall/piper_phonemize.html
+
+numpy
+lhotse
+huggingface_hub
+safetensors
+tensorboard
+vocos
+pydub
+onnxruntime
+git+https://github.com/ysharma3501/LinaCodec.git
+librosa
+transformers<=4.57.6
+
+cn2an
+inflect
+
+jieba
+piper_phonemize
+pypinyin
+setuptools<81
+
+fastapi
+uvicorn

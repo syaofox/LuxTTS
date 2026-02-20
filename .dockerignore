@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Python 环境与缓存
+.venv
+venv
+env
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# 模型权重（运行时从 HuggingFace 下载，不打包进镜像）
+ckpt/
+
+# 参考音频（运行时挂载）
+ref_audio/
+
+# HuggingFace 缓存（运行时挂载）
+cache/
+
+# 开发/文档
+*.md
+!README.md
+.gitignore
+.dockerignore
+.cursorignore
+
+# 构建产物
+dist/
+build/
+*.egg-info/
+*.egg
+
+# 其他
+.DS_Store
+*.log
+legado_config_luxtts.json
+uv.lock

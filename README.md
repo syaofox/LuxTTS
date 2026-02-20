@@ -24,6 +24,22 @@ https://github.com/user-attachments/assets/a3b57152-8d97-43ce-bd99-26dc9a145c29
 - Speed: Reaches speeds of 150x realtime on a single GPU and faster then realtime on CPU's as well.
 - Efficiency: Fits within 1gb vram meaning it can fit in any local gpu.
 
+## Docker (CPU 版)
+
+```bash
+# 使用 docker compose
+docker compose up -d
+
+# 或手动构建并运行
+docker build -t luxtts:cpu .
+docker run -d -p 8765:8765 \
+  -v $(pwd)/ref_audio:/app/ref_audio \
+  -e LUXTTS_REF_AUDIO=ref_audio/default.wav \
+  luxtts:cpu
+```
+
+首次运行会下载模型到 `./cache`，请确保 `ref_audio/` 下有参考音频（如 `default.wav`）。镜像特点：多阶段构建、非 root 用户、CPU 专用（无 CUDA）、体积约 2.5GB。
+
 ## Usage
 You can try it locally, colab, or spaces.
 
